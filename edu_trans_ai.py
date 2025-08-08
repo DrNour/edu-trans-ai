@@ -71,3 +71,13 @@ if uploaded_file is not None:
 
 else:
     st.info("Please upload a CSV file containing 'Student_Translation' and 'Reference_Translation' columns.")
+
+try:
+    df = pd.read_csv(uploaded_file, encoding='utf-8')
+except UnicodeDecodeError:
+    df = pd.read_csv(uploaded_file, encoding='latin1')
+
+# 🚨 New check for empty file
+if df.empty:
+    st.error("The uploaded CSV file is empty. Please upload a valid file with data.")
+    st.stop()
