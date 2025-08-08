@@ -1,77 +1,73 @@
-# edu_trans_ai.py
-
 import streamlit as st
 import pandas as pd
 from difflib import SequenceMatcher
-import textstat
-from collections import Counter
 
-st.set_page_config(page_title="EduTransAI", layout="wide")
+st.title("EduTransAI - Translation Assessment Tool")
 
-st.title("🧠 EduTransAI – Translation Assessment Tool")
+# Upload CSV file widget
+uploaded_file = st.file_uploader("Upload your translations CSV file", type=["csv"])
 
-uploaded_file = st.file_uploader("📤 Upload a CSV file with student translations", type=["csv"])
+if uploaded_file is not None:
+    # Try reading the CSV with UTF-8 encoding; fallback to latin1 if error
+    try:
+        df = pd.read_csv(uploaded_file, encoding='utf-8')
+    except UnicodeDecodeError:
+        df = pd.read_csv(uploaded_file, encoding='latin1')
+    
+    st.success("CSV file loaded successfully! Here's a preview:")
+    st.dataframe(df)
 
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
+    # Check if required columns exist
+    required_columns = ['Student_Translation', 'Reference_Translation']
+    if all(col in df.columns for col in required_columns):
+        
+        st.write("Starting assessment...")
 
-    st.success("File uploaded successfully!")
+        # Create columns for scores
+        df['Similarity'] = 0.0
+        df['Accuracy_Score'] = 0
+        df['Fluency_Score'] = 0
+        df['Register_Score'] = 0
+        df['Tone_Score'] = 0
 
-    for index, row in df.iterrows():
-        st.markdown(f"### 🔹 Translation {index+1}")
-        col1, col2, col3 = st.columns(3)
+        # For each row, calculate similarity ratio (automated part)
+        for i, row in df.iterrows():
+            s = row['Student_Translation']
+            r = row['Reference_Translation']
+            similarity = SequenceMatcher(None, s, r).ratio()
+            df.at[i, 'Similarity'] = similarity
+        
+        # Show the similarity scores for overview
+        st.write("Similarity Scores between Student and Reference translations:")
+        st.dataframe(df[['Student_Translation', 'Reference_Translation', 'Similarity']])
 
-        with col1:
-            st.markdown("**📝 Source Text**")
-            st.write(row["Source Text"])
+        st.write("Now, please manually score the following dimensions for each translation:")
 
-        with col2:
-            st.markdown("**👨‍🎓 Student Translation**")
-            st.write(row["Student Translation"])
+        # Create interactive manual scoring for each row
+        for i, row in df.iterrows():
+            st.markdown(f"### Translation Pair #{i+1}")
+            st.write("**Student:**", row['Student_Translation'])
+            st.write("**Reference:**", row['Reference_Translation'])
+            df.at[i, 'Accuracy_Score'] = st.slider(f"Accuracy Score (1-5) for pair {i+1}", 1, 5, 3, key=f"acc_{i}")
+            df.at[i, 'Fluency_Score'] = st.slider(f"Fluency Score (1-5) for pair {i+1}", 1, 5, 3, key=f"flu_{i}")
+            df.at[i, 'Register_Score'] = st.slider(f"Register Score (1-5) for pair {i+1}", 1, 5, 3, key=f"reg_{i}")
+            df.at[i, 'Tone_Score'] = st.slider(f"Tone Score (1-5) for pair {i+1}", 1, 5, 3, key=f"tone_{i}")
 
-        with col3:
-            st.markdown("**📘 Reference Translation**")
-            st.write(row["Reference Translation"])
+        # Show a summary table of all scores
+        st.write("### Summary of Scores")
+        st.dataframe(df[['Student_Translation', 'Similarity', 'Accuracy_Score', 'Fluency_Score', 'Register_Score', 'Tone_Score']])
 
-        # Simple accuracy score using sequence matcher
-        acc = SequenceMatcher(None, row["Student Translation"], row["Reference Translation"]).ratio()
+        # Optionally, allow user to download the scores as CSV
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Download Assessment Results as CSV",
+            data=csv,
+            file_name='translation_assessment_results.csv',
+            mime='text/csv',
+        )
 
-        # Fluency score using textstat
-        try:
-            fluency = 100 - textstat.flesch_reading_ease(row["Student Translation"])
-        except:
-            fluency = "N/A"
-
-        # Register / tone (basic keyword match)
-        informal_words = ["جداً", "كتير", "عايز", "فيه"]
-        tone_penalty = any(word in row["Student Translation"] for word in informal_words)
-        tone_score = "Too Informal" if tone_penalty else "Formal Enough"
-
-        st.markdown(f"""
-        **🧾 Evaluation**
-        - ✅ Accuracy: `{acc:.2f}`
-        - ✍️ Fluency Score: `{fluency}`
-        - 🎭 Register/Tone: `{tone_score}`
-        """)
-
-        st.markdown("---")
-
-    # Glossary extraction
-    st.header("📚 Glossary Extractor")
-    gloss = []
-
-    for i, row in df.iterrows():
-        src_words = row["Source Text"].split()
-        tgt_words = row["Student Translation"].split()
-        for s, t in zip(src_words, tgt_words):
-            gloss.append((s.strip(".,؟"), t.strip(".,؟")))
-
-    glossary_df = pd.DataFrame(gloss, columns=["English", "Arabic"])
-    glossary_df = glossary_df.drop_duplicates().value_counts().reset_index(name='Frequency')
-
-    st.dataframe(glossary_df)
-
-    st.download_button("⬇️ Download Glossary", glossary_df.to_csv(index=False), file_name="glossary.csv")
+    else:
+        st.error(f"CSV file must contain the following columns: {required_columns}")
 
 else:
-    st.info("Please upload a CSV file to begin.")
+    st.info("Please upload a CSV file containing 'Student_Translation' and 'Reference_Translation' columns.")
