@@ -1,5 +1,7 @@
 from difflib import SequenceMatcher
 import re
+import streamlit as st
+import pandas as pd
 
 # --- Arabic-friendly tokenization ---
 def tokenize_arabic(text):
@@ -11,7 +13,7 @@ def tokenize_arabic(text):
 def categorize_errors(src_text, student_text):
     errors = []
     src_tokens = src_text.lower().split()
-    stu_tokens = tokenize_arabic(student_text)
+    stu_tokens = tokenize_arabic(student_text.lower())
 
     # 1. Omission
     if len(stu_tokens) < len(src_tokens) * 0.9:
@@ -39,46 +41,62 @@ def categorize_errors(src_text, student_text):
     return errors
 
 # --- Main app ---
-import streamlit as st
-import pandas as pd
-
 st.title("EduTransAI - Translation Assessment Tool")
 
 uploaded_file = st.file_uploader("Upload your translations CSV file", type=["csv"])
 
 if uploaded_file is not None:
+    # Read CSV with error handling
     try:
         df = pd.read_csv(uploaded_file, encoding='utf-8')
     except UnicodeDecodeError:
-        df = pd.read_csv(uploaded_file, encoding='latin1')
+        try:
+            df = pd.read_csv(uploaded_file, encoding='latin1')
+        except Exception as e:
+            st.error(f"Failed to read the CSV file: {e}")
+            st.stop()
+    except Exception as e:
+        st.error(f"An unexpected error occurred reading the file: {e}")
+        st.stop()
 
     st.success("CSV file loaded successfully! Here's a preview:")
     st.dataframe(df)
 
     required_columns = ['Student_Translation', 'Reference_Translation']
-    if all(col in df.columns for col in required_columns):
-        df['Similarity'] = 0.0
-        df['Errors Detected'] = ""
+    if not all(col in df.columns for col in required_columns):
+        st.error(f"CSV file must contain these columns: {required_columns}. Found columns: {list(df.columns)}")
+        st.stop()
 
-        for i, row in df.iterrows():
-            s = str(row['Student_Translation'])
-            r = str(row['Reference_Translation'])
-            df.at[i, 'Similarity'] = SequenceMatcher(None, s, r).ratio()
+    # Clean data columns
+    df['Student_Translation'] = df['Student_Translation'].fillna("").astype(str)
+    df['Reference_Translation'] = df['Reference_Translation'].fillna("").astype(str)
+
+    # Prepare columns for results
+    df['Similarity'] = 0.0
+    df['Errors Detected'] = ""
+
+    # Process translations with error handling inside loop
+    for i, row in df.iterrows():
+        try:
+            s = row['Student_Translation']
+            r = row['Reference_Translation']
+            similarity = SequenceMatcher(None, s, r).ratio()
             errors = categorize_errors(r, s)
+            df.at[i, 'Similarity'] = similarity
             df.at[i, 'Errors Detected'] = ", ".join(errors) if errors else "No major errors"
+        except Exception as e:
+            df.at[i, 'Errors Detected'] = f"Error processing row: {e}"
 
-        st.write("### Assessment Results with Error Categories")
-        st.dataframe(df[['Student_Translation', 'Reference_Translation', 'Similarity', 'Errors Detected']])
+    st.write("### Assessment Results with Error Categories")
+    st.dataframe(df[['Student_Translation', 'Reference_Translation', 'Similarity', 'Errors Detected']])
 
-        # Download button
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="Download Results as CSV",
-            data=csv,
-            file_name='translation_assessment_results.csv',
-            mime='text/csv'
-        )
-    else:
-        st.error(f"CSV file must contain: {required_columns}")
+    # Download button
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download Results as CSV",
+        data=csv,
+        file_name='translation_assessment_results.csv',
+        mime='text/csv'
+    )
 else:
     st.info("Please upload a CSV file containing 'Student_Translation' and 'Reference_Translation' columns.")
