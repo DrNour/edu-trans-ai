@@ -25,7 +25,7 @@
     section { padding:72px 0; }
     h2 { font-size:2rem; letter-spacing:-.03em; margin:0 0 15px; }
     .lead { color:var(--muted); max-width:780px; margin:0 0 30px; }
-    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px; }
     .card { padding:25px; border:1px solid var(--line); border-radius:12px; background:white; box-shadow:0 2px 8px rgba(18,38,58,.035); }
     .card h3 { margin:0 0 10px; font-size:1.18rem; }
     .card p { color:var(--muted); margin:0 0 18px; }
@@ -71,7 +71,7 @@
     <div class="wrap">
       <div class="eyebrow">Tools</div>
       <h2>A focused research-to-impact toolkit</h2>
-      <p class="lead">A focused platform and supporting research tools connect classroom practice, translation-quality evaluation, and reproducible Arabic–English research analytics.</p>
+      <p class="lead">Two public tools connect classroom practice, translation-quality evaluation, and responsible Arabic–English AI.</p>
       <div class="grid">
         <article class="card">
           <span class="tag">Flagship platform</span>
@@ -84,12 +84,6 @@
           <h3>Translation Comparison</h3>
           <p>Compare alternative translations using structured feedback on accuracy, fluency, style, terminology, errors, and semantic similarity.</p>
           <a href="https://github.com/DrNour/EduTransAI-translation-comparison">View repository →</a>
-        </article>
-        <article class="card">
-          <span class="tag">Research infrastructure</span>
-          <h3>ArabicEduNLP</h3>
-          <p>The internal reproducible analytics layer supporting EduApp-PE: text normalisation, bilingual tokenisation, edit operations, record validation, and research-ready exports.</p>
-          <a href="https://github.com/DrNour/arabicedunlp">View repository →</a>
         </article>
       </div>
     </div>
